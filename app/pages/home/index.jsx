@@ -5,10 +5,11 @@
  * For full license text, see the LICENSE file in the repo root or https://opensource.org/licenses/BSD-3-Clause
  */
 
-import React, {useEffect} from 'react'
+import React, {useEffect, useState} from 'react'
 import PropTypes from 'prop-types'
 import {useIntl, FormattedMessage} from 'react-intl'
 import {useLocation} from 'react-router-dom'
+
 
 // Components
 import {
@@ -21,7 +22,9 @@ import {
     Flex,
     Stack,
     Container,
-    Link
+    Link, 
+    Radio, 
+    RadioGroup
 } from '@chakra-ui/react'
 
 // Project Components
@@ -29,6 +32,7 @@ import Hero from '../../components/hero'
 import Seo from '../../components/seo'
 import Section from '../../components/section'
 import ProductScroller from '../../components/product-scroller'
+import StateValue from '../../components/exercise-5'
 
 // Others
 import {getAssetUrl} from 'pwa-kit-react-sdk/ssr/universal/utils'
@@ -62,6 +66,9 @@ const Home = ({productSearchResult, isLoading}) => {
 
     return (
         <Box data-testid="home-page" layerStyle="page">
+                
+            <StateValue />
+
             <Seo
                 title="Home Page"
                 description="Commerce Cloud Retail React App"
