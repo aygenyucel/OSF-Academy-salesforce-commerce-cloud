@@ -12,10 +12,15 @@ import {
     HOME_SHOP_PRODUCTS_LIMIT
 } from '../../constants'
 
+import {helpers, ShopperLogin, ShopperSearch, ShopperProducts} from 'commerce-sdk-isomorphic';
+
+
 const ProductScroller = ({productSearchResult, isLoading, addedProducts, productListProp }) => {
 
     const [productID, setProductID] = useState("");
     const [productList, setProductList] = useState([]);
+    const [productListString, setProductListString] = useState("") //format: "25589419M,91736743M,25591410M"
+    
 
     const handleChangeProductID = (e) => {
          setProductID(e.target.value)
@@ -31,6 +36,8 @@ const ProductScroller = ({productSearchResult, isLoading, addedProducts, product
             setProductID("")
             productListProp = newArr
             console.log("productListProp addddd", productListProp)
+
+            setProductListString(productListString.split(",") + ","+ productID.toString())
         }
     }
 
@@ -46,6 +53,147 @@ const ProductScroller = ({productSearchResult, isLoading, addedProducts, product
             }
         }
     }
+
+    useEffect(() => {
+        console.log("sdsd", addedProducts)
+    }, [addedProducts])
+
+    // useEffect(() => {
+    //     const newProductListString = productList.join(",").toString()
+    //     setProductListString(newProductListString)
+    //     console.log("jksnfsdfk",newProductListString)
+    // }, [productList])
+
+
+    // Create a configuration to use when creating API clients
+    const config = {
+        proxy: 'http://localhost:3000/mobify/proxy/api', // Routes API calls through a proxy when set
+        headers: {},
+        parameters: {
+            clientId: '1d763261-6522-4913-9d52-5d947d3b94c4',
+            organizationId: 'f_ecom_zzte_053',
+            shortCode: 'kv7kzm78',
+            siteId: 'RefArch'
+        },
+        throwOnBadResponse: true,
+    };
+    const shopperLogin = new ShopperLogin(config);
+
+   const  getGuestAccessToken = async() => {
+        // Execute Public Client OAuth with PKCE to acquire guest tokens
+        const {access_token, refresh_token} = await helpers.loginGuestUser(
+            shopperLogin,
+            {redirectURI: `http://localhost:3000/callback`} // Callback URL must be configured in SLAS Admin
+            );
+            return access_token
+    }
+
+
+    const [shopperSearch, setShopperSearch] = useState(null)
+    const [searchResult, setSearchResult] = useState(null)
+    const [shopperProductsClient, setShopperProductsClient] = useState(null)
+    const [shopperProducts, setShopperProducts] = useState(null)
+
+    const createSearchResult = async() => {
+        await shopperSearch.productSearch({
+            parameters: {q: 'shirt'},
+            }).then((newSearchResult) => {setSearchResult(newSearchResult)
+            })
+    }
+
+    const createShopperSearch = async () => {
+       await getGuestAccessToken().then((access_token) => {
+        //    console.log("access", access_token)
+            const newShopperSearch = new ShopperSearch({
+                ...config,
+                headers: {authorization: `Bearer ${access_token}`},
+                });
+            setShopperSearch(newShopperSearch)
+            console.log(":///", newShopperSearch)
+            return newShopperSearch
+        })
+    }
+
+    const getSearchResult = async () => {
+        await createShopperSearch().then(() => {createSearchResult()})
+        
+    }
+
+    const createShopperProductsClient = async () => {
+        await getGuestAccessToken().then((access_token) => {
+            const newShopperProductsClient = new ShopperProducts({
+                ...config,
+                headers: {authorization: `Bearer ${access_token}`},
+                });
+            setShopperProductsClient(newShopperProductsClient) 
+            return newShopperProductsClient
+         })
+        
+    }
+
+    const getShopperProducts = async (productListString) => {
+        await createShopperProductsClient().then(async () => {
+            const products = await shopperProductsClient.getProducts({parameters: {
+                // ids: "25589419M,91736743M,25591410M"
+                ids: productListString
+            }})
+            // const editedProducts = []
+            // console.log("bgbgbg", );
+
+            // products.map((product) => {
+            //     console.log("fsdljfs", product);
+            //     editedProducts.push(
+            //         {currency: product.currency,
+            //         name: product.name,
+            //         price: product.price,
+            //         productID: product.id,
+            //         image: product.imageGroups[0].images[0]}
+            //         )
+            //     })
+            setShopperProducts(products)
+            return products
+        })
+    }
+
+    const [editedProducts, setEditedProducts] = useState(null)
+
+    const editProductsObjectForScroller = () => {
+        let editedProductsForScroller = []
+        console.log("bgbgbg", shopperProducts);
+
+        shopperProducts?.data.map((product) => {
+            console.log("zzzzz", product);
+            editedProductsForScroller.push(
+                {currency: product.currency,
+                name: product.name,
+                price: product.price,
+                productId: product.id,
+                image: product.imageGroups[0].images[0]}
+                )
+        })
+
+        setEditedProducts(editedProductsForScroller)
+    }
+
+    useEffect(() => {
+    //    getSearchResult()
+    //    createShopperProductsClient()
+    console.log("productListString =>>>>", productListString)
+       getShopperProducts(productListString)
+    }, [productListString])
+
+    useEffect(() => {
+        editProductsObjectForScroller()
+    }, [shopperProducts])
+
+    useEffect(() => {
+        console.log("edited products =>>>>**", editedProducts)
+    }, [editedProducts])
+
+    useEffect(() => {
+        console.log("searchResult =>>>>", searchResult)
+        console.log("shopperProducts =>>>>", shopperProducts)
+    }, [searchResult, shopperProducts])
     
     return (
         <>
@@ -81,10 +229,19 @@ const ProductScroller = ({productSearchResult, isLoading, addedProducts, product
                 Product Scroller
 
                 {addedProducts && (
-                <>
+                    <>
                         <Stack pt={8} spacing={16}>
-                            <ProductScrollerPWA
+                            {/* <ProductScrollerPWA
                                 products={addedProducts.data}
+                                isLoading={isLoading}
+                            /> */}
+                            <ProductScrollerPWA
+                                // products={[ {currency: addedProducts.data[0].currency,
+                                // name: addedProducts.data[0].name,
+                                // price: addedProducts.data[0].price,
+                                // productID: addedProducts.data[0].id,
+                                // image: addedProducts.data[0].imageGroups[0].images[0]}]}
+                                products = {editedProducts}
                                 isLoading={isLoading}
                             />
                         </Stack>
@@ -119,10 +276,7 @@ ProductScroller.getProps = async ({res, api, location, productListProp}) => {
 
     const addedProducts = await api.shopperProducts.getProducts({
         parameters: {
-            // id: urlParams.get('pid') || productId,
             ids: "25589419M,91736743M,25591410M"
-            // ids: productListProp.join(",")
-            // ids: productListProp ? `${productListProp}.join(",")` : ""
         }
     
         // parameters: {
