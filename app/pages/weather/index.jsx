@@ -70,14 +70,16 @@ const WeatherApp = () => {
                 break;
 
             case "Clear":
-                setBgImage("https://images.unsplash.com/photo-1601345459799-245d61f56121?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80")
-                setCustomText(`It's Sunny in ${citySearched}`)
+                setBgImage("https://images.unsplash.com/photo-1469122312224-c5846569feb1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1889&q=80")
+                setCustomText(`There is ${description} in ${citySearched}`)
                 break;
             case "Clouds":
                 setBgImage("https://images.unsplash.com/photo-1501630834273-4b5604d2ee31?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80")
                 setCustomText(`It's ${description} in ${citySearched}`)
                 break;
             default:
+                setBgImage("https://images.unsplash.com/photo-1538947151057-dfe933d688d1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80")
+                setCustomText(`It's ${description} in ${citySearched}`)
                 break;
         }
     }
@@ -102,9 +104,7 @@ const WeatherApp = () => {
                         setDescription(weatherData.weather[0].description);
                         setMain(weatherData.weather[0].main);
                         setCitySearched(city)
-
-                        customizeContent(weatherData.weather[0].main, city.toUpperCase(), weatherData.weather[0].description)
-
+                        customizeContent(weatherData.weather[0].main, geoData[0].name, weatherData.weather[0].description)
                         
                     } else {
                         console.log("opps, error when fetching!")
@@ -133,7 +133,7 @@ const WeatherApp = () => {
                         <Input placeholder='City' maxWidth="350px" value={city} onChange={handleChangeCity}/>
                         <Button onClick={searchWeather}>Search</Button>
                     </Box>
-                    {geoData.length > 0 && weatherData && 
+                    {geoData?.length > 0 && weatherData && 
                         <Box mt={3} className="weatherApp-result" display="flex" flexDirection="column" justifyContent="center" alignItems="center" backgroundColor="blue.200" padding={3} backgroundImage={`${bgImage}`} 
                         
                         >
