@@ -15,12 +15,16 @@ const ProductScroller = () => {
         
     const [productID, setProductID] = useState("");
     const [productList, setProductList] = useState([]);
-    const [productListString, setProductListString] = useState("") //format: "25589419M,91736743M,25591410M"
+    //ids in array
+    const [productListString, setProductListString] = useState("") 
+    //format: "25589419M,91736743M,25591410M"
+    //ids in string format for sending the ids to productScrollerPWA component
     
 
     const [shopperProductsClient, setShopperProductsClient] = useState(null)
     const [shopperProducts, setShopperProducts] = useState(null)
     const [editedProducts, setEditedProducts] = useState(null)
+    //edited shopperProducts data for sending products to productScrollerPWA
 
     const handleChangeProductID = (e) => {
          setProductID(e.target.value)
@@ -66,8 +70,11 @@ const ProductScroller = () => {
         },
         throwOnBadResponse: true,
     };
+
     const shopperLogin = new ShopperLogin(config);
 
+
+    //getting an access token for guests
     const  getGuestAccessToken = async() => {
         // Execute Public Client OAuth with PKCE to acquire guest tokens
         const {access_token, refresh_token} = await helpers.loginGuestUser(
@@ -104,6 +111,8 @@ const ProductScroller = () => {
     //     await createShopperSearch().then(() => {createSearchResult()}) 
     // }
 
+
+    //creating shopper client with using the access token 
     const createShopperProductsClient = async () => {
         await getGuestAccessToken().then((access_token) => {
             const newShopperProductsClient = new ShopperProducts({
@@ -112,10 +121,10 @@ const ProductScroller = () => {
                 });
             setShopperProductsClient(newShopperProductsClient) 
             return newShopperProductsClient
-         })
-        
+         }) 
     }
 
+    //getting shopper products with provided IDs 
     const getShopperProducts = async (productListString) => {
         await createShopperProductsClient().then(async () => {
             const products = await shopperProductsClient.getProducts({parameters: {
@@ -127,13 +136,14 @@ const ProductScroller = () => {
     }
 
 
+    //editing shopper products with the desired format for the ProductScrollerPWA
     const editProductsObjectForScroller = () => {
         let editedProductsForScroller = []
-        console.log("bgbgbg", shopperProducts);
+        // console.log("bgbgbg", shopperProducts);
 
         if(shopperProducts?.data) {
             shopperProducts.data.map((product) => {
-                console.log("zzzzz", product);
+                // console.log("zzzzz", product);
                 editedProductsForScroller.push(
                     {currency: product.currency,
                     name: product.name,
@@ -145,31 +155,35 @@ const ProductScroller = () => {
         }
         setEditedProducts(editedProductsForScroller)
     }
-
+    
     const [isScrollerOpen, setIsScrollerOpen] = useState(false)
+
+    //showing product scroller after "Get Products button" clicked 
     const showProductScroller = () => {
         if(shopperProducts) {
-            // editProductsObjectForScroller()
             setIsScrollerOpen(true)
         }
     }
-    
+
+
+    //update edited shopper products every time shopper products changes
     useEffect(() => {
         editProductsObjectForScroller()
     }, [shopperProducts])
 
+    //update shopper products every time productListString changes 
     useEffect(() => {
         getShopperProducts(productListString)
-        console.log("productListString =>>>>", productListString)
+        // console.log("productListString =>>>>", productListString)
     }, [productListString])
 
-    useEffect(() => {
-        console.log("editedProducts =>>>>", editedProducts)
-    }, [editedProducts])
+    // useEffect(() => {
+    //     console.log("editedProducts =>>>>", editedProducts)
+    // }, [editedProducts])
 
-    useEffect(() => {
-        console.log("shopperProducts =>>>>", shopperProducts)
-    }, [shopperProducts])
+    // useEffect(() => {
+    //     console.log("shopperProducts =>>>>", shopperProducts)
+    // }, [shopperProducts])
     
     return (
         <>
