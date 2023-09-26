@@ -36,6 +36,7 @@ const ProductDetail = loadable(() => import('./pages/product-detail'), {fallback
 const ProductList = loadable(() => import('./pages/product-list'), {fallback})
 const Wishlist = loadable(() => import('./pages/account/wishlist'), {fallback})
 const Youtube = loadable(() => import('./pages/youtube'), {fallback})
+const ProductScroller = loadable(() => import('./pages/product-scroller'), {fallback})
 const PageNotFound = loadable(() => import('./pages/page-not-found'))
 
 const routes = [
@@ -102,6 +103,10 @@ const routes = [
     {
         path: '/youtube',
         component: Youtube
+    },
+    {
+        path: '/product-scroller',
+        component: ProductScroller
     },
     {
         path: '*',
