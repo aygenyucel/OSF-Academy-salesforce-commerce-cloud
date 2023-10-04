@@ -219,7 +219,6 @@ const ProductView = forwardRef(
                 else if(addToWishlist) {
                     addToWishlist(product, variant, quantity)
                 } else if(removeFromWishlist) {
-                    console.log("trying")
                     removeFromWishlist(product)
                 }
             }

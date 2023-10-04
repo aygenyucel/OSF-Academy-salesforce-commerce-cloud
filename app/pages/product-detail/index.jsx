@@ -33,7 +33,8 @@ import {
     API_ERROR_MESSAGE,
     MAX_CACHE_AGE,
     TOAST_ACTION_VIEW_WISHLIST,
-    TOAST_MESSAGE_ADDED_TO_WISHLIST
+    TOAST_MESSAGE_ADDED_TO_WISHLIST,
+    TOAST_MESSAGE_REMOVED_FROM_WISHLIST
 } from '../../constants'
 import {rebuildPathWithParams} from '../../utils/url'
 import {useHistory} from 'react-router-dom'
@@ -53,6 +54,8 @@ const ProductDetail = ({category, product, isLoading}) => {
     const [isInWishlist, setIsInWishlist] = useState(null)
 
     const isProductASet = product?.type.set
+
+    
 
     // This page uses the `primaryCategoryId` to retrieve the category data. This attribute
     // is only available on `master` products. Since a variation will be loaded once all the
@@ -95,19 +98,26 @@ const ProductDetail = ({category, product, isLoading}) => {
         }
     }
 
-    //every time wishlist change, check product still in wishlist
+    //every time wishlist & product change, check product still in wishlist
     useEffect(() => {
+        // console.log("current wishlist =>", wishlist)
         checkProductInWishList()
-    }, [wishlist])
+        
+    }, [wishlist, product])
 
-    // useEffect(() => {console.log("is product in wishlist already?", isInWishlist)}, [isInWishlist])
+
+    useEffect(() => {
+        // console.log("current wishlist =>", wishlist)
+        checkProductInWishList()
+    }, [])
+
+    // useEffect(() => {console.log("is product in wishlist already?", isInWishlist); }, [isInWishlist])
 
     const handleAddToWishlist = async (product, variant, quantity) => {
         try {
 
-            console.log("wishlisht object:", wishlist)
-            console.log("product", product)
-
+            // console.log("wishlisht object =>", wishlist)
+            // console.log("product =>", product)
 
             await wishlist.createListItem({
                 id: variant?.productId || product?.id,
@@ -127,7 +137,7 @@ const ProductDetail = ({category, product, isLoading}) => {
                     </Button>
                 )
             })
-            setIsInWishlist(true)
+            
         } catch {
             toast({
                 title: formatMessage(API_ERROR_MESSAGE),
@@ -137,7 +147,24 @@ const ProductDetail = ({category, product, isLoading}) => {
     }
 
     const handleRemoveFromWishList = async () => {
-        //TODO: removing element from wishlist, update setstate
+        try {
+            await wishlist.removeListItemByProductId(product.id)
+
+            toast({
+                title: formatMessage(TOAST_MESSAGE_REMOVED_FROM_WISHLIST, {quantity: 1}),
+                status: 'success',
+                action: (
+                    <Button variant="link" onClick={() => navigate('/account/wishlist')}>
+                        {formatMessage(TOAST_ACTION_VIEW_WISHLIST)}
+                    </Button>
+                )
+            })
+        } catch {
+            toast({
+                title: formatMessage(API_ERROR_MESSAGE),
+                status: 'error'
+            })
+        }
     }
 
     /**************** Add To Cart ****************/
