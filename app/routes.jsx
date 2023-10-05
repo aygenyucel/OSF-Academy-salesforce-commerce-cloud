@@ -38,6 +38,7 @@ const Wishlist = loadable(() => import('./pages/account/wishlist'), {fallback})
 const Youtube = loadable(() => import('./pages/youtube'), {fallback})
 const PageNotFound = loadable(() => import('./pages/page-not-found'))
 
+
 const routes = [
     {
         path: '/',
