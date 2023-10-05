@@ -72,6 +72,9 @@ import {
 import useNavigation from '../../hooks/use-navigation'
 import LoadingSpinner from '../../components/loading-spinner'
 
+//#########################################################
+import {helpers, ShopperLogin, ShopperSearch} from 'commerce-sdk-isomorphic';
+
 // NOTE: You can ignore certain refinements on a template level by updating the below
 // list of ignored refinements.
 const REFINEMENT_DISALLOW_LIST = ['c_isNew']
@@ -84,7 +87,6 @@ const REFINEMENT_DISALLOW_LIST = ['c_isNew']
 const ProductList = (props) => {
     const {
         searchQuery,
-        productSearchResult,
         category,
         // eslint-disable-next-line react/prop-types
         staticContext,
@@ -92,6 +94,8 @@ const ProductList = (props) => {
         isLoading,
         ...rest
     } = props
+
+    const [productSearchResult, setProductSearchResult] = useState(null)
     const {total, sortingOptions} = productSearchResult || {}
     const {isOpen, onOpen, onClose} = useDisclosure()
     const [sortOpen, setSortOpen] = useState(false)
@@ -122,6 +126,7 @@ const ProductList = (props) => {
     // keep track of the items has been add/remove to/from wishlist
     const [wishlistLoading, setWishlistLoading] = useState([])
     // TODO: DRY this handler when intl provider is available globally
+
     const addItemToWishlist = async (product) => {
         try {
             setWishlistLoading([...wishlistLoading, product.productId])
@@ -250,6 +255,135 @@ const ProductList = (props) => {
     if (!selectedSortingOptionLabel) {
         selectedSortingOptionLabel = productSearchResult?.sortingOptions?.[0]
     }
+
+    //################################################################3
+
+    // Create a configuration to use when creating API clients
+    const config = {
+        proxy: 'http://localhost:3000/mobify/proxy/api', // Routes API calls through a proxy when set
+        headers: {},
+        parameters: {
+            clientId: '1d763261-6522-4913-9d52-5d947d3b94c4',
+            organizationId: 'f_ecom_zzte_053',
+            shortCode: 'kv7kzm78',
+            siteId: 'RefArch'
+        },
+        throwOnBadResponse: true,
+    };
+
+    const shopperLogin = new ShopperLogin(config);
+
+    //getting an access token for guests
+    const  getGuestAccessToken = async() => {
+        // Execute Public Client OAuth with PKCE to acquire guest tokens
+        const {access_token, refresh_token} = await helpers.loginGuestUser(
+            shopperLogin,
+            {redirectURI: `http://localhost:3000/callback`} // Callback URL must be configured in SLAS Admin
+            );
+            return access_token
+    }
+
+    const [shopperSearch, setShopperSearch] = useState(null)
+
+
+    //creating shopperSearch Client
+    function createShopperSearch (){
+        // eslint-disable-next-line no-async-promise-executor
+        return new Promise( (resolve,reject) => {
+             getGuestAccessToken().then((access_token) => {
+                   try {
+                       //    console.log("access", access_token)
+                       const newShopperSearch = new ShopperSearch({
+                           ...config,
+                           headers: {authorization: `Bearer ${access_token}`},
+                       });
+                       setShopperSearch(newShopperSearch)
+                       console.log(":///", newShopperSearch)
+                       resolve( newShopperSearch)
+                   } catch (error) {
+                       reject(error)
+                   }
+               })
+        })
+       
+        
+    }
+
+    const [customLimit, setCustomLimit] = useState(10)
+
+     function createSearchResult (newLimit) {
+        // eslint-disable-next-line no-async-promise-executor
+        return new Promise ( async (resolve, reject) => {
+            // console.log("fffffffffffff", customLimit)
+            try {
+                const {categoryId} = params
+                const searchParams = parseSearchParams(location.search, false)
+                    if (!searchParams.refine.includes(`cgid=${categoryId}`) && categoryId) {
+                        searchParams.refine.push(`cgid=${categoryId}`)
+                    }
+                const  newProductSearchResult = await 
+                    shopperSearch?.productSearch({
+                        // parameters: searchParams
+                        parameters: {
+                            offset: 0,
+                            refine: [null,
+                            `cgid=${categoryId}`],
+                            limit: newLimit
+                    }
+                    })
+
+                setProductSearchResult(newProductSearchResult)
+
+                // console.log("jfkeshfjdkfsd", searchParams)
+                // console.log("newProductSearchResult", newProductSearchResult)
+                
+
+                if(productSearchResult) {
+                    // Apply disallow list to refinements.
+                    productSearchResult.refinements = productSearchResult?.refinements?.filter(
+                        ({attributeId}) => !REFINEMENT_DISALLOW_LIST.includes(attributeId)
+                    )
+                }
+
+                // The `isomorphic-sdk` returns error objects when they occur, so we
+                // need to check the category type and throw if required.
+                if (category?.type?.endsWith('category-not-found')) {
+                    throw new HTTPNotFound(category.detail)
+                }
+            } catch (error) {
+                reject(error)
+            }
+        })
+    }
+
+    function updateCustomLimit () {
+        return new Promise((resolve,reject) => {
+            try {
+                const newLimit = customLimit + 10
+                setCustomLimit(newLimit)
+                // setCustomLimit(newLimit)
+                resolve(newLimit)  
+            } catch (error) {
+                reject(error)
+            }
+                
+        })
+    }
+
+    const loadMoreProducts = () => {
+        updateCustomLimit().then((newLimit) => {createSearchResult(newLimit)})
+    }
+
+    useEffect(() => {createShopperSearch(customLimit)}, [])
+    useEffect(() => {createSearchResult(customLimit)}, [shopperSearch])
+    useEffect(() => {console.log("xxxxx", productSearchResult)}, [productSearchResult])
+
+    //if category changes, reload the product search results
+    useEffect(() => {
+        const newLimit = 10;
+        setCustomLimit(newLimit)
+        createShopperSearch(newLimit)
+    }, [params])
 
     return (
         <Box
@@ -436,29 +570,10 @@ const ProductList = (props) => {
                                       })}
                             </SimpleGrid>
                             {/* Footer */}
-                            <Flex
-                                justifyContent={['center', 'center', 'flex-start']}
-                                paddingTop={8}
-                            >
-                                <Pagination currentURL={basePath} urls={pageUrls} />
+                            {/* np */}
 
-                                {/*
-                            Our design doesn't call for a page size select. Show this element if you want
-                            to add one to your design.
-                        */}
-                                <Select
-                                    display="none"
-                                    value={basePath}
-                                    onChange={({target}) => {
-                                        history.push(target.value)
-                                    }}
-                                >
-                                    {limitUrls.map((href, index) => (
-                                        <option key={href} value={href}>
-                                            {DEFAULT_LIMIT_VALUES[index]}
-                                        </option>
-                                    ))}
-                                </Select>
+                            <Flex marginTop="3" justifyContent="center">
+                                <Button onClick={() => {loadMoreProducts()}}>Load More</Button>
                             </Flex>
                         </Box>
                     </Grid>
@@ -579,7 +694,7 @@ ProductList.shouldGetProps = ({previousLocation, location}) =>
     previousLocation.pathname !== location.pathname ||
     previousLocation.search !== location.search
 
-ProductList.getProps = async ({res, params, location, api}) => {
+ProductList.getProps = async ({res, params, location}) => {
     const {categoryId} = params
     const urlParams = new URLSearchParams(location.search)
     let searchQuery = urlParams.get('q')
@@ -605,29 +720,12 @@ ProductList.getProps = async ({res, params, location, api}) => {
         res.set('Cache-Control', `max-age=${MAX_CACHE_AGE}`)
     }
 
-    const [category, productSearchResult] = await Promise.all([
-        isSearch
-            ? Promise.resolve()
-            : api.shopperProducts.getCategory({
-                  parameters: {id: categoryId, levels: 0}
-              }),
-        api.shopperSearch.productSearch({
-            parameters: searchParams
-        })
-    ])
+    // let customLimit = 10
 
-    // Apply disallow list to refinements.
-    productSearchResult.refinements = productSearchResult?.refinements?.filter(
-        ({attributeId}) => !REFINEMENT_DISALLOW_LIST.includes(attributeId)
-    )
+    //####################################################################
+    
 
-    // The `isomorphic-sdk` returns error objects when they occur, so we
-    // need to check the category type and throw if required.
-    if (category?.type?.endsWith('category-not-found')) {
-        throw new HTTPNotFound(category.detail)
-    }
-
-    return {searchQuery: searchQuery, productSearchResult, category}
+    return {searchQuery: searchQuery}
 }
 
 ProductList.propTypes = {
