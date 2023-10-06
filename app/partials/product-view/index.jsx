@@ -90,6 +90,7 @@ const ProductView = forwardRef(
             updateCart,
             addToWishlist,
             updateWishlist,
+            removeFromWishlist,
             isProductLoading,
             isProductPartOfSet = false,
             onVariantSelected = () => {},
@@ -166,6 +167,10 @@ const ProductView = forwardRef(
                 addSetToWishlist: intl.formatMessage({
                     defaultMessage: 'Add Set to Wishlist',
                     id: 'product_view.button.add_set_to_wishlist'
+                }),
+                removeFromWishlist: intl.formatMessage({
+                    defaultMessage: 'Remove from Wishlist',
+                    id: 'product_view.button.remove_from_wishlist'
                 })
             }
 
@@ -206,12 +211,16 @@ const ProductView = forwardRef(
             }
 
             const handleWishlistItem = async () => {
-                if (!updateWishlist && !addToWishlist) return null
+                if (!updateWishlist && !addToWishlist && !removeFromWishlist) return null
                 if (updateWishlist) {
                     updateWishlist(product, variant, quantity)
                     return
                 }
-                addToWishlist(product, variant, quantity)
+                else if(addToWishlist) {
+                    addToWishlist(product, variant, quantity)
+                } else if(removeFromWishlist) {
+                    removeFromWishlist(product)
+                }
             }
 
             if (addToCart || updateCart) {
@@ -249,6 +258,24 @@ const ProductView = forwardRef(
                             : isProductASet
                             ? buttonText.addSetToWishlist
                             : buttonText.addToWishlist}
+                    </ButtonWithRegistration>
+                )
+            }
+
+            //-****************************************************************************************************************
+
+            if(removeFromWishlist) {
+                buttons.push(
+                    <ButtonWithRegistration
+                        key="wishlist-button"
+                        onClick={handleWishlistItem}
+                        disabled={isWishlistLoading || !canAddToWishlist}
+                        isLoading={isWishlistLoading}
+                        width="100%"
+                        variant="outline"
+                        marginBottom={4}
+                    >
+                        {buttonText.removeFromWishlist}
                     </ButtonWithRegistration>
                 )
             }
@@ -526,6 +553,7 @@ ProductView.propTypes = {
     isWishlistLoading: PropTypes.bool,
     addToCart: PropTypes.func,
     addToWishlist: PropTypes.func,
+    removeFromWishlist: PropTypes.func,
     updateCart: PropTypes.func,
     updateWishlist: PropTypes.func,
     showFullLink: PropTypes.bool,

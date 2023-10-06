@@ -33,7 +33,8 @@ import {
     API_ERROR_MESSAGE,
     MAX_CACHE_AGE,
     TOAST_ACTION_VIEW_WISHLIST,
-    TOAST_MESSAGE_ADDED_TO_WISHLIST
+    TOAST_MESSAGE_ADDED_TO_WISHLIST,
+    TOAST_MESSAGE_REMOVED_FROM_WISHLIST
 } from '../../constants'
 import {rebuildPathWithParams} from '../../utils/url'
 import {useHistory} from 'react-router-dom'
@@ -50,8 +51,11 @@ const ProductDetail = ({category, product, isLoading}) => {
     const [primaryCategory, setPrimaryCategory] = useState(category)
     const [productSetSelection, setProductSetSelection] = useState({})
     const childProductRefs = React.useRef({})
+    const [isInWishlist, setIsInWishlist] = useState(null)
 
     const isProductASet = product?.type.set
+
+    
 
     // This page uses the `primaryCategoryId` to retrieve the category data. This attribute
     // is only available on `master` products. Since a variation will be loaded once all the
@@ -77,8 +81,44 @@ const ProductDetail = ({category, product, isLoading}) => {
     /**************** Wishlist ****************/
     const wishlist = useWishlist()
     // TODO: DRY this handler when intl provider is available globally
+
+    // ****************************************************************************************************************************
+
+    //checking if product is already in wishlisht, updates setstate
+    const checkProductInWishList = () => {
+
+        const currentWishlistProducts = wishlist?.data?.customerProductListItems
+        // console.log("currentWishListProducts =>>",currentWishlistProducts)
+        // console.log("product =>>", product)
+
+        if (currentWishlistProducts?.filter(wishProduct => wishProduct.productId === product?.id).length > 0) {
+            setIsInWishlist(true)
+        } else {
+            setIsInWishlist(false)
+        }
+    }
+
+    //every time wishlist & product change, check product still in wishlist
+    useEffect(() => {
+        // console.log("current wishlist =>", wishlist)
+        checkProductInWishList()
+        
+    }, [wishlist, product])
+
+
+    useEffect(() => {
+        // console.log("current wishlist =>", wishlist)
+        checkProductInWishList()
+    }, [])
+
+    // useEffect(() => {console.log("is product in wishlist already?", isInWishlist); }, [isInWishlist])
+
     const handleAddToWishlist = async (product, variant, quantity) => {
         try {
+
+            // console.log("wishlisht object =>", wishlist)
+            // console.log("product =>", product)
+
             await wishlist.createListItem({
                 id: variant?.productId || product?.id,
                 quantity
@@ -92,6 +132,28 @@ const ProductDetail = ({category, product, isLoading}) => {
                     // with Chakra Toast, since the ToastManager is rendered via portal
                     // and the toast doesn't have access to intl provider, which is a
                     // requirement of the Link component.
+                    <Button variant="link" onClick={() => navigate('/account/wishlist')}>
+                        {formatMessage(TOAST_ACTION_VIEW_WISHLIST)}
+                    </Button>
+                )
+            })
+            
+        } catch {
+            toast({
+                title: formatMessage(API_ERROR_MESSAGE),
+                status: 'error'
+            })
+        }
+    }
+
+    const handleRemoveFromWishList = async () => {
+        try {
+            await wishlist.removeListItemByProductId(product.id)
+
+            toast({
+                title: formatMessage(TOAST_MESSAGE_REMOVED_FROM_WISHLIST, {quantity: 1}),
+                status: 'success',
+                action: (
                     <Button variant="link" onClick={() => navigate('/account/wishlist')}>
                         {formatMessage(TOAST_ACTION_VIEW_WISHLIST)}
                     </Button>
@@ -199,17 +261,30 @@ const ProductDetail = ({category, product, isLoading}) => {
                 {isProductASet ? (
                     <Fragment>
                         {/* Product Set: parent product */}
-                        <ProductView
-                            product={product}
-                            category={primaryCategory?.parentCategoryTree || []}
-                            addToCart={handleProductSetAddToCart}
-                            addToWishlist={(product, variant, quantity) =>
-                                handleAddToWishlist(product, variant, quantity)
-                            }
-                            isProductLoading={isLoading}
-                            isCustomerProductListLoading={!wishlist.isInitialized}
-                            validateOrderability={handleProductSetValidation}
-                        />
+                        {isInWishlist 
+                        ? 
+                            <ProductView
+                                    product={product}
+                                    category={primaryCategory?.parentCategoryTree || []}
+                                    addToCart={handleProductSetAddToCart}
+                                    removeFromWishlist={(product) => handleRemoveFromWishList(product)}
+                                    isProductLoading={isLoading}
+                                    isCustomerProductListLoading={!wishlist.isInitialized}
+                                    validateOrderability={handleProductSetValidation}
+                            />
+                        :   <ProductView
+                                product={product}
+                                category={primaryCategory?.parentCategoryTree || []}
+                                addToCart={handleProductSetAddToCart}
+                                addToWishlist={(product, variant, quantity) =>
+                                    handleAddToWishlist(product, variant, quantity)
+                                }
+                                isProductLoading={isLoading}
+                                isCustomerProductListLoading={!wishlist.isInitialized}
+                                validateOrderability={handleProductSetValidation}
+                            />
+                        }
+                        
 
                         <hr />
 
@@ -218,6 +293,46 @@ const ProductDetail = ({category, product, isLoading}) => {
                             // Product Set: render the child products
                             product.setProducts.map((childProduct) => (
                                 <Box key={childProduct.id} data-testid="child-product">
+                                    {isInWishlist
+                                    ? 
+                                    <ProductView
+                                        // Do no use an arrow function as we are manipulating the functions scope.
+                                        ref={function (ref) {
+                                            // Assign the "set" scope of the ref, this is how we access the internal
+                                            // validation.
+                                            childProductRefs.current[childProduct.id] = {
+                                                ref,
+                                                validateOrderability: this.validateOrderability
+                                            }
+                                        }}
+                                        product={childProduct}
+                                        isProductPartOfSet={true}
+                                        addToCart={(variant, quantity) =>
+                                            handleAddToCart([
+                                                {product: childProduct, variant, quantity}
+                                            ])
+                                        }
+                                        removeFromWishlist={(product) => handleRemoveFromWishList(product)}
+                                        onVariantSelected={(product, variant, quantity) => {
+                                            if (quantity) {
+                                                setProductSetSelection((previousState) => ({
+                                                    ...previousState,
+                                                    [product.id]: {
+                                                        product,
+                                                        variant,
+                                                        quantity
+                                                    }
+                                                }))
+                                            } else {
+                                                const selections = {...productSetSelection}
+                                                delete selections[product.id]
+                                                setProductSetSelection(selections)
+                                            }
+                                        }}
+                                        isProductLoading={isLoading}
+                                        isCustomerProductListLoading={!wishlist.isInitialized}
+                                    />
+                                    :
                                     <ProductView
                                         // Do no use an arrow function as we are manipulating the functions scope.
                                         ref={function (ref) {
@@ -257,6 +372,8 @@ const ProductDetail = ({category, product, isLoading}) => {
                                         isProductLoading={isLoading}
                                         isCustomerProductListLoading={!wishlist.isInitialized}
                                     />
+                                    }
+                                    
                                     <InformationAccordion product={childProduct} />
 
                                     <Box display={['none', 'none', 'none', 'block']}>
@@ -268,18 +385,33 @@ const ProductDetail = ({category, product, isLoading}) => {
                     </Fragment>
                 ) : (
                     <Fragment>
-                        <ProductView
-                            product={product}
-                            category={primaryCategory?.parentCategoryTree || []}
-                            addToCart={(variant, quantity) =>
-                                handleAddToCart([{product, variant, quantity}])
-                            }
-                            addToWishlist={(product, variant, quantity) =>
-                                handleAddToWishlist(product, variant, quantity)
-                            }
-                            isProductLoading={isLoading}
-                            isCustomerProductListLoading={!wishlist.isInitialized}
-                        />
+                        {isInWishlist 
+                        ?
+                            <ProductView
+                                product={product}
+                                category={primaryCategory?.parentCategoryTree || []}
+                                addToCart={(variant, quantity) =>
+                                    handleAddToCart([{product, variant, quantity}])
+                                }
+                                removeFromWishlist={(product) => handleRemoveFromWishList(product)}
+                                isProductLoading={isLoading}
+                                isCustomerProductListLoading={!wishlist.isInitialized}
+                            />
+                        : 
+                            <ProductView
+                                product={product}
+                                category={primaryCategory?.parentCategoryTree || []}
+                                addToCart={(variant, quantity) =>
+                                    handleAddToCart([{product, variant, quantity}])
+                                }
+                                addToWishlist={(product, variant, quantity) =>
+                                    handleAddToWishlist(product, variant, quantity)
+                                }
+                                isProductLoading={isLoading}
+                                isCustomerProductListLoading={!wishlist.isInitialized}
+                            />
+                        }
+                        
                         <InformationAccordion product={product} />
                     </Fragment>
                 )}
