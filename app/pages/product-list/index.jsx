@@ -71,6 +71,8 @@ import {
 } from '../../constants'
 import useNavigation from '../../hooks/use-navigation'
 import LoadingSpinner from '../../components/loading-spinner'
+import ProductViewModal from '../../components/product-view-modal'
+import { ShopperLogin, ShopperProducts, helpers } from "commerce-sdk-isomorphic";
 
 // NOTE: You can ignore certain refinements on a template level by updating the below
 // list of ignored refinements.
@@ -149,7 +151,7 @@ const ProductList = (props) => {
                 status: 'error'
             })
         } finally {
-            setWishlistLoading(wishlistLoading.filter((id) => id !== product.productId))
+            setWishlistLoading(wishlistLoading?.filter((id) => id !== product.productId))
         }
     }
 
@@ -168,7 +170,7 @@ const ProductList = (props) => {
                 status: 'error'
             })
         } finally {
-            setWishlistLoading(wishlistLoading.filter((id) => id !== product.productId))
+            setWishlistLoading(wishlistLoading?.filter((id) => id !== product.productId))
         }
     }
 
@@ -251,6 +253,65 @@ const ProductList = (props) => {
         selectedSortingOptionLabel = productSearchResult?.sortingOptions?.[0]
     }
 
+    //####################################################################################
+
+    const [selectedProduct, setSelectedProduct] = useState(null)
+    const [shopperProductsClient, setShopperProductsClient] = useState()
+    const [isFilterModalOpen, setIsFilterModalOpen] = useState(false)
+
+    //creates configuration for the api
+    const clientConfig = {
+        proxy: 'http://localhost:3000/mobify/proxy/api', // Routes API calls through a proxy when set
+        headers: {},
+        parameters: {
+            clientId: '1d763261-6522-4913-9d52-5d947d3b94c4',
+            organizationId: 'f_ecom_zzte_053',
+            shortCode: 'kv7kzm78',
+            siteId: 'RefArch'
+        },
+        throwOnBadResponse: true,
+    };
+
+    const shopperLogin = new ShopperLogin(clientConfig);
+
+    //gets an access token for guests
+    const  getGuestAccessToken = async() => {
+        const {access_token} = await helpers.loginGuestUser(
+            shopperLogin,
+            {redirectURI: `http://localhost:3000/callback`} // Callback URL must be configured in SLAS Admin
+            );
+            return access_token
+    }
+
+    //creates new shopper client with using access token
+    const createNewShopperProductsClient = async () => {
+        await getGuestAccessToken().then((access_token) => {
+            const newShopperProductsClient = new ShopperProducts({
+                ...clientConfig,
+                headers: {authorization: `Bearer ${access_token}`},
+                }); 
+            setShopperProductsClient(newShopperProductsClient)
+            return(newShopperProductsClient)
+           
+            })
+        }
+
+    //triggers after clicking Quick View Button
+    const handleClickQuickView = async (productSearchItem) => {
+        //productSearchItem: selected product from product tile
+        const product = await shopperProductsClient.getProduct({parameters: {id: productSearchItem.productId}})
+        setSelectedProduct(product)
+        onOpen()
+
+        // console.log("productSearchItem =>", productSearchItem); 
+        // console.log("product =>", product);
+    }
+
+    //creates new shopper client at first render
+    useEffect(() => {
+        createNewShopperProductsClient()
+    }, [])
+
     return (
         <Box
             className="sf-product-list-page"
@@ -269,7 +330,6 @@ const ProductList = (props) => {
             ) : (
                 <>
                     {/* Header */}
-
                     <Stack
                         display={{base: 'none', lg: 'flex'}}
                         direction="row"
@@ -328,7 +388,8 @@ const ProductList = (props) => {
                                         marginRight={2}
                                         display="inline-flex"
                                         leftIcon={<FilterIcon boxSize={5} />}
-                                        onClick={onOpen}
+                                        onClick={() => {onOpen(); setIsFilterModalOpen(true)}}
+                                        backgroundColor="red.300"
                                     >
                                         <FormattedMessage
                                             defaultMessage="Filter"
@@ -391,49 +452,66 @@ const ProductList = (props) => {
                                           .map((value, index) => (
                                               <ProductTileSkeleton key={index} />
                                           ))
-                                    : productSearchResult.hits.map((productSearchItem) => {
+                                    : productSearchResult?.hits?.map((productSearchItem) => {
                                           const productId = productSearchItem.productId
                                           const isInWishlist =
                                               !!wishlist.findItemByProductId(productId)
 
                                           return (
-                                              <ProductTile
-                                                  data-testid={`sf-product-tile-${productSearchItem.productId}`}
-                                                  key={productSearchItem.productId}
-                                                  product={productSearchItem}
-                                                  enableFavourite={true}
-                                                  isFavourite={isInWishlist}
-                                                  onClick={() => {
-                                                      if (searchQuery) {
-                                                          einstein.sendClickSearch(
-                                                              searchQuery,
-                                                              productSearchItem
-                                                          )
-                                                      } else if (category) {
-                                                          einstein.sendClickCategory(
-                                                              category,
-                                                              productSearchItem
-                                                          )
-                                                      }
-                                                  }}
-                                                  onFavouriteToggle={(isFavourite) => {
-                                                      const action = isFavourite
-                                                          ? addItemToWishlist
-                                                          : removeItemFromWishlist
-                                                      return action(productSearchItem)
-                                                  }}
-                                                  dynamicImageProps={{
-                                                      widths: [
-                                                          '50vw',
-                                                          '50vw',
-                                                          '20vw',
-                                                          '20vw',
-                                                          '25vw'
-                                                      ]
-                                                  }}
-                                              />
+                                                <Flex key={productSearchItem.productId} direction="column" justifyContent="space-between">
+                                                    <ProductTile
+                                                        data-testid={`sf-product-tile-${productSearchItem.productId}`}
+                                                        key={productSearchItem.productId}
+                                                        product={productSearchItem}
+                                                        enableFavourite={true}
+                                                        isFavourite={isInWishlist}
+                                                        onClick={() => {
+                                                            if (searchQuery) {
+                                                                einstein.sendClickSearch(
+                                                                    searchQuery,
+                                                                    productSearchItem
+                                                                )
+                                                            } else if (category) {
+                                                                einstein.sendClickCategory(
+                                                                    category,
+                                                                    productSearchItem
+                                                                )
+                                                            }
+                                                        }}
+                                                        onFavouriteToggle={(isFavourite) => {
+                                                            const action = isFavourite
+                                                                ? addItemToWishlist
+                                                                : removeItemFromWishlist
+                                                            return action(productSearchItem)
+                                                        }}
+                                                        dynamicImageProps={{
+                                                            widths: [
+                                                                '50vw',
+                                                                '50vw',
+                                                                '20vw',
+                                                                '20vw',
+                                                                '25vw'
+                                                            ]
+                                                        }}
+                                                    />
+                                                    <Button mt="3" value={productSearchItem} onClick={() => {handleClickQuickView(productSearchItem)}}>Quick View</Button>
+                                                    
+                                              </Flex>
                                           )
                                       })}
+                                        <Box>
+                                            {isOpen && selectedProduct && (
+                                                console.log("dddddddddddddddddddddddddddddddddddddd"),
+                                                <ProductViewModal
+                                                    isOpen={isOpen}
+                                                    onOpen={onOpen}
+                                                    onClose={onClose}
+                                                    product={selectedProduct}
+                                                    
+                                                />
+                                            )}
+                                        </Box>
+                                    
                             </SimpleGrid>
                             {/* Footer */}
                             <Flex
@@ -465,8 +543,8 @@ const ProductList = (props) => {
                 </>
             )}
             <Modal
-                isOpen={isOpen}
-                onClose={onClose}
+                isOpen={isFilterModalOpen}
+                onClose={() => {onClose(); setIsFilterModalOpen(false)}}
                 size="full"
                 motionPreset="slideInBottom"
                 scrollBehavior="inside"
